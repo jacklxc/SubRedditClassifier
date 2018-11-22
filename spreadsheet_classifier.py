@@ -34,19 +34,21 @@ class SpreadsheetClassificationExecution:
 
         #training params
         batch_size = 128
-        num_epochs = 100
+        num_epochs = 300
 
         #model parameters
         num_filters = 64
         embed_dim = 100
         weight_decay = 1e-4
 
-        if classifier_type == 'SuperSimpleLSTMClassifier':
-            classifier = SuperSimpleLSTMClassifier(embedding_matrix, sd.max_seq_len, sd.n_classes)
-        elif classifier_type == 'FancyConvolutionNetworkClassifier':
-            classifier = FancyConvolutionNetworkClassifier(embedding_matrix, sd.max_seq_len, sd.n_classes)
-        elif classifier_type == 'BidirectionalLSTMClassifier':
-            classifier = BidirectionalLSTMClassifier(embedding_matrix, sd.max_seq_len, sd.n_classes)
+        if classifier_type == 'SimpleLSTM':
+            classifier = SimpleLSTM(embedding_matrix, sd.max_seq_len, sd.n_classes)
+        elif classifier_type == 'SimpleCNN':
+            classifier = SimpleCNN(embedding_matrix, sd.max_seq_len, sd.n_classes)
+        elif classifier_type == 'BiLSTM':
+            classifier = BiLSTM(embedding_matrix, sd.max_seq_len, sd.n_classes)
+        elif classifier_type == 'CNNBiLSTM':
+            classifier = CNNBiLSTM(embedding_matrix, sd.max_seq_len, sd.n_classes)
         else:
             raise ValueError("Incorrect Classifier Type: %s"%(classifier_type))
 
@@ -65,13 +67,13 @@ class SpreadsheetClassificationExecution:
 
 class SpreadsheetData:
 
-    def __init__(self, datafile, labelfile, testSize, vocab, randomize=False, MAX_NUM_WORDS = 400000):
-        raw_doc = self.read_txt(datafile)
-        raw_label = self.read_txt(labelfile)
+    def __init__(self, datafile, labelfile, testSize, vocab, limit, randomize=False, MAX_NUM_WORDS = 400000):
+        raw_doc = self.read_txt(datafile,limit)
+        raw_label = self.read_txt(labelfile,limit)
         n_rec = len(raw_doc)
         
-        raw_doc_np = np.array(raw_doc,dtype=str)
-        raw_label_np = np.array(raw_label,dtype=str)
+        raw_doc_np = np.array(raw_doc)
+        raw_label_np = np.array(raw_label)
 
         if randomize:
             self.randomized = True
@@ -87,7 +89,7 @@ class SpreadsheetData:
         train_label = raw_label_np[train_indices].tolist()
         test_label = raw_label_np[test_indices].tolist()
 
-        self.labels = list(set(raw_label))
+        self.labels = list(set(raw_label_np.tolist()))
         self.n_classes = len(self.labels)
 
         y_train_base = [self.labels.index(i) for i in train_label]
@@ -136,14 +138,14 @@ class SpreadsheetData:
         self.y_train = keras.utils.to_categorical(y_train_base, num_classes=self.n_classes)
         self.y_test = keras.utils.to_categorical(y_test_base, num_classes=self.n_classes)
 
-    def read_txt(self, filename, limit=1000):
+    def read_txt(self, filename, limit=None):
         count = 0
         raw_docs = []
-        with codecs.open(filename, "r", "utf-8","ignore") as f:
+        with codecs.open(filename, "r", "utf-8") as f:
             for line in f:
                 raw_docs.append(line.strip())
                 count += 1
-                if count > limit:
+                if limit is not None and count > limit:
                     break
         return raw_docs
 
@@ -168,7 +170,7 @@ class SpreadsheetData:
                     return '<NUM>'
         return word
     
-class FancyConvolutionNetworkClassifier:
+class SimpleCNN:
 
     rep_max = -100000.0
     rep_size = 0
@@ -180,7 +182,7 @@ class FancyConvolutionNetworkClassifier:
 
         self.model = Sequential()
         self.model.add(Embedding(nb_words, embed_dim,
-            weights=[embedding_matrix], input_length=max_seq_len, trainable=True))
+            weights=[embedding_matrix], input_length=max_seq_len, trainable=False))
         self.model.add(Dropout(0.25))
         self.model.add(Conv1D(num_filters, 7, activation='relu', padding='same'))
         self.model.add(MaxPooling1D(2))
@@ -188,14 +190,14 @@ class FancyConvolutionNetworkClassifier:
         self.model.add(GlobalMaxPooling1D())
         self.model.add(Dropout(0.5))
         self.model.add(Dense(32, activation='relu', kernel_regularizer=regularizers.l2(weight_decay)))
-        self.model.add(Dense(n_classes, activation='sigmoid'))  #multi-label (k-hot encoding)
+        self.model.add(Dense(n_classes, activation='softmax'))  #multi-label (k-hot encoding)
 
         adam = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
         self.model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
         self.model.summary()
 
         
-class SuperSimpleLSTMClassifier:
+class SimpleLSTM:
 
     def __init__(self, embedding_matrix, max_seq_len, n_classes):
 
@@ -204,32 +206,59 @@ class SuperSimpleLSTMClassifier:
 
         self.model = Sequential()
         self.model.add(Embedding(nb_words, embed_dim,
-                            weights=[embedding_matrix], input_length=max_seq_len, trainable=True))
+                            weights=[embedding_matrix], input_length=max_seq_len, trainable=False))
         self.model.add(Dropout(0.5))
         self.model.add(LSTM(128))
         self.model.add(Dropout(0.5))
-        self.model.add(Dense(n_classes, activation='sigmoid'))
+        self.model.add(Dense(n_classes, activation='softmax'))
         self.model.compile(loss='categorical_crossentropy',
-                      optimizer=RMSprop(lr=0.001),
+                      optimizer="adam",
                       metrics=['accuracy'])
         self.model.summary()
 
-class BidirectionalLSTMClassifier:
+class BiLSTM:
     def __init__(self, embedding_matrix, max_seq_len, n_classes):
         nb_words = embedding_matrix.shape[0]
         embed_dim = embedding_matrix.shape[1]
 
         self.model = Sequential()
         self.model.add(Embedding(nb_words, embed_dim,
-                                 weights=[embedding_matrix], input_length=max_seq_len, trainable=True))
+                                 weights=[embedding_matrix], input_length=max_seq_len, trainable=False))
         self.model.add(Dropout(0.5))
         self.model.add(Bidirectional(LSTM(128)))
         self.model.add(Dropout(0.5))
-        self.model.add(Dense(n_classes, activation='sigmoid'))
+        self.model.add(Dense(n_classes, activation='softmax'))
         self.model.compile(loss='categorical_crossentropy',
-                           optimizer='rmsprop',
+                           optimizer='adam',
                            metrics=['accuracy'])
         self.model.summary()
 
+class CNNBiLSTM:
+    def __init__(self, embedding_matrix, max_seq_len, n_classes, num_filters = 64, weight_decay = 1e-4):
 
+        reg = 1e-4
+        dropout = 0.4
+        nb_words = embedding_matrix.shape[0]
+        embed_dim = embedding_matrix.shape[1]
+
+        self.model = Sequential()
+        self.model.add(Embedding(nb_words, embed_dim,
+            weights=[embedding_matrix], input_length=max_seq_len, trainable=False))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv1D(num_filters, 3, strides=1, activation='relu', padding='valid',\
+                              kernel_regularizer=regularizers.l2(reg), bias_regularizer=regularizers.l2(reg)))
+        self.model.add(Dropout(dropout))
+        self.model.add(MaxPooling1D(2))
+        self.model.add(Conv1D(num_filters, 3, strides=1, activation='relu', padding='valid',\
+                              kernel_regularizer=regularizers.l2(reg), bias_regularizer=regularizers.l2(reg)))
+        self.model.add(Dropout(dropout))
+        self.model.add(Bidirectional(LSTM(64,kernel_regularizer=regularizers.l2(reg),\
+                                  recurrent_regularizer=regularizers.l2(reg), \
+                                  bias_regularizer=regularizers.l2(reg))))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(n_classes, activation='softmax'))  #multi-label (k-hot encoding)
+
+        adam = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+        self.model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
+        self.model.summary()
 
