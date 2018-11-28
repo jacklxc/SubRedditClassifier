@@ -33,7 +33,7 @@ class SpreadsheetClassificationExecution:
     def __init__(self, sd, embedding_matrix, classifier_type) :
 
         #training params
-        batch_size = 128
+        batch_size = 512
         num_epochs = 300
 
         #model parameters
@@ -58,7 +58,7 @@ class SpreadsheetClassificationExecution:
         #early_stopping = EarlyStopping(patience = 10)
         hist = model.fit(sd.x_train, sd.y_train, batch_size=batch_size,
                          epochs=num_epochs, validation_split=0.1,
-                         shuffle=True, verbose=2)
+                         shuffle=True, verbose=1)
         
         score = model.evaluate(sd.x_test, sd.y_test, verbose=2)
         self.loss = score[0]
@@ -234,7 +234,7 @@ class BiLSTM:
         self.model.summary()
 
 class CNNBiLSTM:
-    def __init__(self, embedding_matrix, max_seq_len, n_classes, num_filters = 64, weight_decay = 1e-4):
+    def __init__(self, embedding_matrix, max_seq_len, n_classes, num_filters = 128, weight_decay = 1e-4):
 
         reg = 1e-4
         dropout = 0.4
@@ -245,20 +245,21 @@ class CNNBiLSTM:
         self.model.add(Embedding(nb_words, embed_dim,
             weights=[embedding_matrix], input_length=max_seq_len, trainable=False))
         self.model.add(Dropout(dropout))
-        self.model.add(Conv1D(num_filters, 3, strides=1, activation='relu', padding='valid',\
+        self.model.add(Conv1D(num_filters, 7, strides=1, activation='relu', padding='valid',\
                               kernel_regularizer=regularizers.l2(reg), bias_regularizer=regularizers.l2(reg)))
         self.model.add(Dropout(dropout))
         self.model.add(MaxPooling1D(2))
-        self.model.add(Conv1D(num_filters, 3, strides=1, activation='relu', padding='valid',\
+        self.model.add(Conv1D(num_filters, 7, strides=1, activation='relu', padding='valid',\
                               kernel_regularizer=regularizers.l2(reg), bias_regularizer=regularizers.l2(reg)))
         self.model.add(Dropout(dropout))
-        self.model.add(Bidirectional(LSTM(64,kernel_regularizer=regularizers.l2(reg),\
+        self.model.add(Bidirectional(LSTM(512,kernel_regularizer=regularizers.l2(reg),\
                                   recurrent_regularizer=regularizers.l2(reg), \
                                   bias_regularizer=regularizers.l2(reg))))
         self.model.add(Dropout(dropout))
         self.model.add(Dense(n_classes, activation='softmax'))  #multi-label (k-hot encoding)
-
-        adam = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+        lr = 0.001
+        decay = lr / 300
+        adam = optimizers.Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=decay)
         self.model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
         self.model.summary()
 

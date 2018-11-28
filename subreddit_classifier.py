@@ -5,13 +5,13 @@ from spreadsheet_classifier import *
 import argparse
 from tqdm import tqdm
 
-dataFile = "data/contents.20.txt"
-labelFile = "data/labels.20.txt"
-repFile = "glove.6B.50d.txt"
-model_name = "BiLSTM"
+dataFile = "data/contents.100.txt"
+labelFile = "data/labels.100.txt"
+repFile = "/nas/evidx/corpora/XiangciLi/embeddings/glove.6B.300d.txt"
+model_name = "CNNBiLSTM"
 randomizeTestSet = True
 MAX_NUM_WORDS = 400000
-limit = 10000
+limit = 100000
 testSize = int(limit*0.1)
 
 reset_random_seed(0)
