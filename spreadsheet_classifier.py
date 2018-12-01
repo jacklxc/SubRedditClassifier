@@ -33,8 +33,8 @@ class SpreadsheetClassificationExecution:
     def __init__(self, sd, embedding_matrix, classifier_type) :
 
         #training params
-        batch_size = 512
-        num_epochs = 300
+        batch_size = 256
+        num_epochs = 100
 
         #model parameters
         num_filters = 64
@@ -58,9 +58,10 @@ class SpreadsheetClassificationExecution:
         #early_stopping = EarlyStopping(patience = 10)
         hist = model.fit(sd.x_train, sd.y_train, batch_size=batch_size,
                          epochs=num_epochs, validation_split=0.1,
-                         shuffle=True, verbose=1)
+                         shuffle=True, verbose=2)
         
         score = model.evaluate(sd.x_test, sd.y_test, verbose=2)
+        self.prediction = model.predict(sd.x_test)
         self.loss = score[0]
         self.accuracy = score[1]
         print("Test accuracy:",score[1])
@@ -183,13 +184,13 @@ class SimpleCNN:
         self.model = Sequential()
         self.model.add(Embedding(nb_words, embed_dim,
             weights=[embedding_matrix], input_length=max_seq_len, trainable=False))
-        self.model.add(Dropout(0.25))
+        self.model.add(Dropout(0.5))
         self.model.add(Conv1D(num_filters, 7, activation='relu', padding='same'))
         self.model.add(MaxPooling1D(2))
         self.model.add(Conv1D(num_filters, 7, activation='relu', padding='same'))
         self.model.add(GlobalMaxPooling1D())
         self.model.add(Dropout(0.5))
-        self.model.add(Dense(32, activation='relu', kernel_regularizer=regularizers.l2(weight_decay)))
+        self.model.add(Dense(64, activation='relu', kernel_regularizer=regularizers.l2(weight_decay)))
         self.model.add(Dense(n_classes, activation='softmax'))  #multi-label (k-hot encoding)
 
         adam = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
@@ -258,7 +259,7 @@ class CNNBiLSTM:
         self.model.add(Dropout(dropout))
         self.model.add(Dense(n_classes, activation='softmax'))  #multi-label (k-hot encoding)
         lr = 0.001
-        decay = lr / 300
+        decay = lr / 100
         adam = optimizers.Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=decay)
         self.model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
         self.model.summary()

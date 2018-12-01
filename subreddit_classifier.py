@@ -4,7 +4,9 @@ from embedding_reader import EmbeddingReader
 from spreadsheet_classifier import *
 import argparse
 from tqdm import tqdm
-
+import pickle
+import numpy as np
+print("Complex label!")
 dataFile = "data/contents.100.txt"
 labelFile = "data/labels.100.txt"
 repFile = "/nas/evidx/corpora/XiangciLi/embeddings/glove.6B.300d.txt"
@@ -22,3 +24,6 @@ sd = SpreadsheetData(dataFile, labelFile, testSize, vacab, limit, randomizeTestS
 
 embedding_matrix = ER.make_embedding_matrix(sd.word_index)
 sce = SpreadsheetClassificationExecution(sd, embedding_matrix, model_name)
+pickle.dump(np.argmax(sce.prediction,axis=1),open("prediction_complex.pkl","wb"))
+pickle.dump(np.argmax(sd.y_test,axis=1),open("true_label_complex.pkl","wb"))
+pickle.dump(sd.labels,open("label_name_complex.pkl","wb"))
